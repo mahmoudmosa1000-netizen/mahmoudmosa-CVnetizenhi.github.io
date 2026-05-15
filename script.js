@@ -14,7 +14,7 @@ let state = {
 let zoom=1;
 let expCount=0, eduCount=0, p2Count=0, eqCount=0, refCount=0, certCount=0, projCount=0;
 let undoStack=[];
-let sectionOrder=['profile','experience','education','komps','hobbies','extraquals','referenzen','zertifikate','projekte'];
+let sectionOrder=['profile','experience','education','komps','hobbies','extraquals','referenzen','zertifikate','projekte','folio'];
 let autoSaveTimer=null;
 let dragSrcId=null, dragType=null;
 
@@ -44,12 +44,13 @@ function getSectionLabels(){return{
   education:t('cvEducation'), komps:t('cvKomps'),
   hobbies:t('cvInterests'), extraquals:t('cvExtraQual'),
   referenzen:t('cvReferenzen'), zertifikate:t('cvZertifikate'), projekte:t('cvProjekte'),
+  folio:t('cvFolioSection')||'Portfolio & Links',
 };}
 // Keep for import/export key validation only (values not shown in UI)
 const SECTION_LABELS={
   profile:'profile', experience:'experience', education:'education', komps:'komps',
   hobbies:'hobbies', extraquals:'extraquals', referenzen:'referenzen',
-  zertifikate:'zertifikate', projekte:'projekte',
+  zertifikate:'zertifikate', projekte:'projekte', folio:'folio',
 };
 function getRoleSuggestions(){ return t('roleSuggestions').split('|'); }
 
@@ -225,6 +226,222 @@ function startAutoSave(){
 // ─── QR CODE ────────────────────────────────────
 let _qrDataUrl = '';
 let _qrFrame   = 'none';
+
+// ─── FOLIO LINKS (multi-entry) ───────────────────
+let _folioLinks = []; // [{id, url, label, showLink, showQR, qrDataUrl}]
+let _folioCount = 0;
+
+function addFolioLink(data = {}) {
+  const id = Date.now() + '_' + Math.random().toString(36).slice(2);
+  _folioCount++;
+  const num = _folioCount;
+  const pos = data.pos || 'left'; // 'left' = sidebar, 'overlay' = free floating on CV
+  _folioLinks.push({ id, url: data.url||'', label: data.label||'', showLink: data.showLink!==false, showQR: !!data.showQR, qrDataUrl: data.qrDataUrl||'', pos });
+
+  const list = document.getElementById('folio-links-list');
+  const card = document.createElement('div');
+  card.className = 'folio-link-card';
+  card.id = 'folio-card-' + id;
+
+  card.innerHTML = `
+    <div class="folio-card-header">
+      <span class="folio-card-icon">🔗</span>
+      <span class="folio-card-num">Link #${num}</span>
+      <button class="folio-card-del" onclick="removeFolioLink('${id}')" title="Entfernen">×</button>
+    </div>
+    <div class="form-group" style="margin-bottom:8px;">
+      <label style="font-size:11px;" data-i18n="labelFolioURL">URL</label>
+      <input type="text" id="fl-url-${id}" value="${esc(data.url||'')}"
+        placeholder="https://behance.net/..." data-i18n="placeholderFolioURL" data-i18n-attr="placeholder"
+        oninput="onFolioLinkInput('${id}')">
+    </div>
+    <div class="form-group" style="margin-bottom:8px;">
+      <label style="font-size:11px;" data-i18n="labelFolioLinkText">Linktext im Lebenslauf</label>
+      <input type="text" id="fl-label-${id}" value="${esc(data.label||'')}"
+        placeholder="z.B. Mein Portfolio" data-i18n="placeholderFolioLinkText" data-i18n-attr="placeholder"
+        oninput="onFolioLinkInput('${id}')">
+      <div style="font-size:10px;color:var(--ink-faint);margin-top:3px;" data-i18n="folioLinkTextHint">
+        Dieser Text erscheint klickbar im Lebenslauf.
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:8px;">
+      <label style="font-size:11px;" data-i18n="labelFolioDisplayAs">Anzeigen als</label>
+      <div class="folio-toggle-row">
+        <label class="folio-toggle-label">
+          <input type="checkbox" id="fl-showlink-${id}" ${data.showLink!==false?'checked':''} onchange="onFolioLinkInput('${id}')">
+          <span data-i18n="folioOptionLink">🔗 Klickbarer Link</span>
+        </label>
+        <label class="folio-toggle-label">
+          <input type="checkbox" id="fl-showqr-${id}" ${data.showQR?'checked':''} onchange="onFolioToggleQR('${id}')">
+          <span data-i18n="folioOptionQR">🔲 QR-Code</span>
+        </label>
+      </div>
+    </div>
+    <!-- QR position selector — shown when QR is active -->
+    <div id="fl-qrpos-wrap-${id}" style="${data.showQR?'':'display:none;'}margin-bottom:8px;">
+      <label style="font-size:11px;" data-i18n="labelFolioQRPos">QR-Code Position</label>
+      <div class="folio-pos-btns" id="fl-posbtn-${id}">
+        <button class="folio-pos-btn ${pos==='left'?'active':''}" onclick="setFolioLinkPos('${id}','left')" data-i18n="folioPosLeft">⬅ Seitenleiste (links)</button>
+        <button class="folio-pos-btn ${pos==='overlay'?'active':''}" onclick="setFolioLinkPos('${id}','overlay')" data-i18n="folioPosOverlay">📌 Frei auf CV</button>
+      </div>
+      <!-- Overlay controls (only when pos=overlay) -->
+      <div id="fl-overlay-controls-${id}" style="${pos==='overlay'?'':'display:none;'}margin-top:8px;padding:8px;background:#f5f5f5;border-radius:7px;">
+        <div style="font-size:10px;color:var(--ink-faint);margin-bottom:6px;" data-i18n="folioOverlayHint">Position auf dem Lebenslauf (in %):</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+          <div>
+            <label style="font-size:10px;">Horizontal: <span id="fl-ox-label-${id}">${data.overlayX||'75'}%</span></label>
+            <input type="range" id="fl-ox-${id}" min="0" max="92" value="${data.overlayX||75}" step="1"
+              oninput="document.getElementById('fl-ox-label-${id}').textContent=this.value+'%';onFolioLinkInput('${id}')"
+              style="width:100%;accent-color:var(--g-muted);">
+          </div>
+          <div>
+            <label style="font-size:10px;">Vertikal: <span id="fl-oy-label-${id}">${data.overlayY||'4'}%</span></label>
+            <input type="range" id="fl-oy-${id}" min="0" max="92" value="${data.overlayY||4}" step="1"
+              oninput="document.getElementById('fl-oy-label-${id}').textContent=this.value+'%';onFolioLinkInput('${id}')"
+              style="width:100%;accent-color:var(--g-muted);">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;">Größe: <span id="fl-os-label-${id}">${data.overlaySize||64}px</span></label>
+          <input type="range" id="fl-os-${id}" min="40" max="130" value="${data.overlaySize||64}" step="4"
+            oninput="document.getElementById('fl-os-label-${id}').textContent=this.value+'px';onFolioLinkInput('${id}')"
+            style="width:100%;accent-color:var(--g-muted);">
+        </div>
+        <div style="margin-top:6px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;">
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',4,4)" style="font-size:9px;">↖ Lo</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',38,4)" style="font-size:9px;">↑ Mo</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',88,4)" style="font-size:9px;">↗ Ro</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',4,44)" style="font-size:9px;">← Lm</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',38,44)" style="font-size:9px;">⊙</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',88,44)" style="font-size:9px;">→ Rm</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',4,86)" style="font-size:9px;">↙ Lu</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',38,86)" style="font-size:9px;">↓ Mu</button>
+          <button class="qr-snap-btn" onclick="snapFolioOverlay('${id}',88,86)" style="font-size:9px;">↘ Ru</button>
+        </div>
+        <div style="font-size:9px;color:var(--ink-faint);margin-top:5px;" data-i18n="folioOverlayDragHint">💡 QR-Code im Vorschau-Bereich direkt verschieben.</div>
+      </div>
+    </div>
+    <div class="folio-qr-mini-preview" id="fl-qrpreview-${id}" ${data.showQR&&data.qrDataUrl?'style="display:block;"':''}>
+      <div class="qr-mini-label" data-i18n="folioQRPreviewLabel">QR-Code Vorschau</div>
+      <div id="fl-qrout-${id}" style="display:inline-block;">${data.qrDataUrl?`<img src="${data.qrDataUrl}" style="width:100px;height:100px;image-rendering:crisp-edges;">`:''}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn-add" style="margin:0;font-size:10px;padding:3px 10px;" onclick="regenerateFolioQR('${id}')" data-i18n="btnRegenQR">🔄 Neu generieren</button>
+        <button class="btn-add" style="margin:0;font-size:10px;padding:3px 10px;" onclick="downloadSingleFolioQR('${id}')" data-i18n="btnDownloadFolioQR">⬇ PNG</button>
+      </div>
+    </div>`;
+
+  list.appendChild(card);
+  if (data.showQR && data.url) setTimeout(() => generateSingleFolioQR(id), 150);
+  render();
+}
+
+function setFolioLinkPos(id, pos) {
+  const obj = getFolioLinkObj(id);
+  if (obj) obj.pos = pos;
+  // Update button active state
+  const wrap = document.getElementById('fl-posbtn-' + id);
+  if (wrap) wrap.querySelectorAll('.folio-pos-btn').forEach(b => b.classList.remove('active'));
+  const btn = wrap && wrap.querySelector(`[onclick*="'${pos}'"]`);
+  if (btn) btn.classList.add('active');
+  // Show/hide overlay controls
+  const oc = document.getElementById('fl-overlay-controls-' + id);
+  if (oc) oc.style.display = pos === 'overlay' ? 'block' : 'none';
+  render();
+}
+
+function snapFolioOverlay(id, x, y) {
+  const ox = document.getElementById('fl-ox-' + id);
+  const oy = document.getElementById('fl-oy-' + id);
+  const lx = document.getElementById('fl-ox-label-' + id);
+  const ly = document.getElementById('fl-oy-label-' + id);
+  if (ox) { ox.value = x; if (lx) lx.textContent = x + '%'; }
+  if (oy) { oy.value = y; if (ly) ly.textContent = y + '%'; }
+  onFolioLinkInput(id);
+}
+
+function removeFolioLink(id) {
+  const card = document.getElementById('folio-card-' + id);
+  if (card) card.remove();
+  _folioLinks = _folioLinks.filter(l => l.id !== id);
+  render();
+}
+
+function getFolioLinkObj(id) {
+  return _folioLinks.find(l => l.id === id);
+}
+
+function onFolioLinkInput(id) {
+  const obj = getFolioLinkObj(id);
+  if (!obj) return;
+  obj.url       = val('fl-url-' + id);
+  obj.label     = val('fl-label-' + id);
+  obj.showLink  = (document.getElementById('fl-showlink-' + id)||{}).checked !== false;
+  obj.overlayX  = parseFloat((document.getElementById('fl-ox-' + id)||{}).value ?? obj.overlayX ?? 75);
+  obj.overlayY  = parseFloat((document.getElementById('fl-oy-' + id)||{}).value ?? obj.overlayY ?? 4);
+  obj.overlaySize = parseInt((document.getElementById('fl-os-' + id)||{}).value || obj.overlaySize || 64);
+  renderDebounced();
+}
+
+function onFolioToggleQR(id) {
+  const obj = getFolioLinkObj(id);
+  if (!obj) return;
+  obj.url      = val('fl-url-' + id);
+  obj.label    = val('fl-label-' + id);
+  obj.showLink = (document.getElementById('fl-showlink-' + id)||{}).checked !== false;
+  obj.showQR   = (document.getElementById('fl-showqr-' + id)||{}).checked;
+  const preview = document.getElementById('fl-qrpreview-' + id);
+  const posWrap = document.getElementById('fl-qrpos-wrap-' + id);
+  if (!obj.showQR) {
+    if (preview) preview.style.display = 'none';
+    if (posWrap) posWrap.style.display = 'none';
+    obj.qrDataUrl = '';
+    render(); return;
+  }
+  if (preview) preview.style.display = 'block';
+  if (posWrap) posWrap.style.display = 'block';
+  generateSingleFolioQR(id);
+}
+
+function generateSingleFolioQR(id) {
+  const obj = getFolioLinkObj(id);
+  if (!obj || !obj.url) return;
+  const outEl = document.getElementById('fl-qrout-' + id);
+  if (!outEl) return;
+  outEl.innerHTML = '';
+  const url = obj.url.startsWith('http') ? obj.url : 'https://' + obj.url;
+  const tmp = document.createElement('div');
+  outEl.appendChild(tmp);
+  try {
+    new QRCode(tmp, { text: url, width: 120, height: 120, colorDark: '#1a2419', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    setTimeout(() => {
+      const img = tmp.querySelector('img') || tmp.querySelector('canvas');
+      if (img) {
+        obj.qrDataUrl = img.tagName === 'CANVAS' ? img.toDataURL('image/png') : img.src;
+      }
+      render();
+    }, 220);
+  } catch(e) { console.warn('Folio QR error', e); }
+}
+
+function regenerateFolioQR(id) {
+  generateSingleFolioQR(id);
+  showToast('🔲 QR-Code wird generiert…');
+}
+
+function downloadSingleFolioQR(id) {
+  const obj = getFolioLinkObj(id);
+  if (!obj || !obj.qrDataUrl) { showToast('⚠ Bitte zuerst eine URL eingeben und QR generieren'); return; }
+  const a = document.createElement('a');
+  a.href = obj.qrDataUrl;
+  const safeName = (obj.label || val('f-name') || 'QR').replace(/\s+/g, '_');
+  a.download = safeName + '_QR.png';
+  a.click();
+}
+
+// Legacy stubs (keep for old saved data compat)
+let _folioQRDataUrl = '';
+function updateFolioQR() {}
+function downloadFolioQR() {}
 
 function selectQRFrame(el, frame) {
   document.querySelectorAll('.qr-frame-opt').forEach(x => x.classList.remove('selected'));
@@ -462,6 +679,40 @@ function initQRDrag(el) {
   }, { passive: false });
 }
 
+// ─── FOLIO OVERLAY DRAG ──────────────────────────
+function initFolioOverlayDrag(el, linkId) {
+  const paper = document.getElementById('cv-paper');
+  let startX, startY, startL, startT;
+  const syncSliders = (pctX, pctY) => {
+    const ox = document.getElementById('fl-ox-' + linkId);
+    const oy = document.getElementById('fl-oy-' + linkId);
+    const lx = document.getElementById('fl-ox-label-' + linkId);
+    const ly = document.getElementById('fl-oy-label-' + linkId);
+    if (ox) { ox.value = Math.round(pctX); if (lx) lx.textContent = Math.round(pctX) + '%'; }
+    if (oy) { oy.value = Math.round(pctY); if (ly) ly.textContent = Math.round(pctY) + '%'; }
+    const obj = getFolioLinkObj(linkId);
+    if (obj) { obj.overlayX = Math.round(pctX); obj.overlayY = Math.round(pctY); }
+  };
+  el.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const rect = paper.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    startL = (parseFloat(el.style.left) / 100) * paper.offsetWidth;
+    startT = (parseFloat(el.style.top)  / 100) * paper.offsetHeight;
+    const onMove = e => {
+      const newL = startL + (e.clientX - startX);
+      const newT = startT + (e.clientY - startY);
+      const pctX = Math.max(0, Math.min(92, (newL / paper.offsetWidth)  * 100));
+      const pctY = Math.max(0, Math.min(92, (newT / paper.offsetHeight) * 100));
+      el.style.left = pctX + '%'; el.style.top = pctY + '%';
+      syncSliders(pctX, pctY);
+    };
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
 // ─── JSON EXPORT ─────────────────────────────────
 function exportJSON() {
   const d = collectData();
@@ -552,7 +803,7 @@ function exportJSON() {
 
 // ─── SECTION ORDER RESET ─────────────────────────
 function resetSectionOrder() {
-  sectionOrder = ['profile','experience','education','komps','hobbies','extraquals','referenzen','zertifikate','projekte'];
+  sectionOrder = ['profile','experience','education','komps','hobbies','extraquals','referenzen','zertifikate','projekte','folio'];
   buildSectionOrderUI();
   render();
   showToast('✓ '+t('toastOrderReset'));
@@ -807,6 +1058,22 @@ function render(){
   const role=val('f-role')||(currentLang==='ar'?'المسمى الوظيفي':currentLang==='en'?'Job Title':'Berufsbezeichnung');
   const email=val('f-email'),phone=val('f-phone'),address=val('f-address'),birth=val('f-birth'),web=val('f-web'),linkedin=val('f-linkedin');
   const webLabel=val('f-web-label')||t('placeholderWebLabel'), summary=val('f-summary'), goal=val('f-goal'), komps=val('f-komps');
+  const folio=val('f-folio'), folioLabel=val('f-folio-label')||t('cvFolio')||'Portfolio';
+  const folioShowLink=(document.getElementById('folio-show-link')||{}).checked!==false;
+  const folioShowQR=(document.getElementById('folio-show-qr')||{}).checked||false;
+  // Collect active multi folio links
+  const activeFolioLinks=_folioLinks.map(l=>({
+    url:l.url||val('fl-url-'+l.id)||'',
+    label:l.label||val('fl-label-'+l.id)||'Portfolio',
+    showLink:(document.getElementById('fl-showlink-'+l.id)||{}).checked!==false,
+    showQR:!!((document.getElementById('fl-showqr-'+l.id)||{}).checked),
+    qrDataUrl:l.qrDataUrl||'',
+    pos:l.pos||'left',
+    id:l.id,
+    overlayX:parseFloat((document.getElementById('fl-ox-'+l.id)||{}).value??l.overlayX??75),
+    overlayY:parseFloat((document.getElementById('fl-oy-'+l.id)||{}).value??l.overlayY??4),
+    overlaySize:parseInt((document.getElementById('fl-os-'+l.id)||{}).value||l.overlaySize||64),
+  })).filter(l=>l.url);
 
   const photoSrc=state.photoData||'';
   const photoShape=(document.getElementById('f-photo-shape')||{}).value||'circle';
@@ -842,6 +1109,7 @@ function render(){
       ${birth?`<div class="cv-contact-item"><span class="cv-contact-label">${t('cvBirth')}</span><span class="cv-contact-val" style="font-size:${Math.round(11*fScale)}px;">${h(birth)}</span></div>`:''}
       ${web?(()=>{const href=web.startsWith('http')?web:'https://'+web;return`<div class="cv-contact-item"><span class="cv-contact-label">${t('cvWeb')}</span><span class="cv-contact-val"><a href="${href}" target="_blank" style="color:inherit;text-decoration:underline;font-weight:700;font-size:${Math.round(11*fScale)}px;">${h(webLabel)}</a></span></div>`;})():''}
       ${linkedin?(()=>{const href=linkedin.startsWith('http')?linkedin:'https://'+linkedin;return`<div class="cv-contact-item"><span class="cv-contact-label">LinkedIn</span><span class="cv-contact-val"><a href="${href}" target="_blank" style="color:inherit;text-decoration:underline;font-weight:700;font-size:${Math.round(11*fScale)}px;">LinkedIn</a></span></div>`;})():''}
+      ${folio&&folioShowLink?(()=>{const href=folio.startsWith('http')?folio:'https://'+folio;return`<div class="cv-contact-item"><span class="cv-contact-label">${t('cvFolioSection')||'Portfolio'}</span><span class="cv-contact-val"><a href="${href}" target="_blank" style="color:inherit;text-decoration:underline;font-weight:700;font-size:${Math.round(11*fScale)}px;">${h(folioLabel)}</a></span></div>`;})():''}
     </div>`;
 
   const activeSkills=state.skills.filter(id=>val('sk-name-'+id));
@@ -944,11 +1212,66 @@ function render(){
       projs.forEach(p=>{const link=p.url?(p.url.startsWith('http')?p.url:'https://'+p.url):'';s+=`<div class="cv-entry" style="border-left-color:${colLight};"><div class="cv-entry-head"><span class="cv-entry-title" style="font-size:${Math.round(12.5*fScale)}px;">${link?`<a href="${link}" target="_blank" style="color:${col};text-decoration:none;">`:''}${h(p.title)}${link?`</a>`:''}</span><span class="cv-entry-date" style="color:${colDark2};font-size:${Math.round(10*fScale)}px;">${h(p.from)}${p.to?' – '+h(p.to):''}</span></div>${p.url?`<div style="font-size:${Math.round(10*fScale)}px;color:${col};margin-top:2px;"><a href="${link}" target="_blank" style="color:${col};">${h(p.url)}</a></div>`:''} ${p.desc?`<div class="cv-entry-desc" style="font-size:${Math.round(11*fScale)}px;line-height:${lineH};">${h(p.desc).replace(/\n/g,'<br>')}</div>`:''}</div>`;});
       return s;
     },
+    // ── FOLIO als sortierbare Sektion (rechte Spalte) ──
+    folio:()=>{
+      const sideLinks = activeFolioLinks.filter(l => l.showLink && l.pos !== 'overlay');
+      const sideQRs   = activeFolioLinks.filter(l => l.showQR && l.qrDataUrl && l.pos !== 'overlay');
+      if(!sideLinks.length && !sideQRs.length) return '';
+      const sectionTitle = t('cvFolioSection')||'Portfolio & Links';
+      let s = `<div class="cv-section-head" style="color:${col};font-size:${Math.round(8.5*fScale)}px;">${sectionTitle}</div>`;
+      // Links as compact rows
+      if(sideLinks.length){
+        s += `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:${sideQRs.length?'10px':'0'};">`;
+        sideLinks.forEach(l=>{
+          const href = l.url.startsWith('http')?l.url:'https://'+l.url;
+          s += `<div style="display:flex;align-items:center;gap:8px;font-size:${Math.round(11*fScale)}px;">
+            <span style="font-size:${Math.round(9*fScale)}px;opacity:0.5;">▸</span>
+            <a href="${href}" target="_blank" style="color:${col};text-decoration:underline;font-weight:600;">${h(l.label||l.url)}</a>
+          </div>`;
+        });
+        s += `</div>`;
+      }
+      // QR codes side-by-side grid
+      if(sideQRs.length){
+        const qrSz = Math.round(62*fScale);
+        s += `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;margin-top:4px;">`;
+        sideQRs.forEach(l=>{
+          s += `<div style="text-align:center;">
+            <img src="${l.qrDataUrl}" style="width:${qrSz}px;height:${qrSz}px;image-rendering:crisp-edges;background:#fff;padding:3px;border-radius:4px;display:block;">
+            <div style="font-size:${Math.round(8*fScale)}px;margin-top:3px;opacity:0.6;font-weight:600;max-width:${qrSz+6}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h(l.label)}</div>
+          </div>`;
+        });
+        s += `</div>`;
+      }
+      return s;
+    },
   };
 
   sectionOrder.forEach(key=>{const r=renderers[key];if(r) rightHTML+=r();});
 
-  // ── QR CODE OVERLAY (frei positionierbar) ──
+  // ── FOLIO LINKS: Seitenleiste (links, pos='left') ──
+  // Remove old standalone folio block — now handled by renderer above.
+  // But sidebar-position links still go into leftHTML:
+  const sidebarFolioLinks = activeFolioLinks.filter(l => l.showLink && l.pos === 'left');
+  const sidebarFolioQRs   = activeFolioLinks.filter(l => l.showQR && l.qrDataUrl && l.pos === 'left');
+  if(sidebarFolioLinks.length || sidebarFolioQRs.length){
+    const sectionTitle = t('cvFolioSection')||'Portfolio & Links';
+    leftHTML += `<div class="cv-l-section"><div class="cv-l-section-title">${sectionTitle}</div>`;
+    sidebarFolioLinks.forEach(l=>{
+      const href = l.url.startsWith('http')?l.url:'https://'+l.url;
+      leftHTML += `<div class="cv-contact-item"><span class="cv-contact-label" style="font-size:${Math.round(9*fScale)}px;">▸</span><span class="cv-contact-val"><a href="${href}" target="_blank" style="color:inherit;text-decoration:underline;font-weight:700;font-size:${Math.round(11*fScale)}px;">${h(l.label||l.url)}</a></span></div>`;
+    });
+    if(sidebarFolioQRs.length){
+      leftHTML += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;justify-content:center;">`;
+      sidebarFolioQRs.forEach(l=>{
+        leftHTML += `<div style="text-align:center;"><img src="${l.qrDataUrl}" style="width:66px;height:66px;image-rendering:crisp-edges;background:#fff;padding:3px;border-radius:4px;display:block;"><div style="font-size:8px;margin-top:3px;opacity:0.65;font-weight:600;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h(l.label)}</div></div>`;
+      });
+      leftHTML += `</div>`;
+    }
+    leftHTML += `</div>`;
+  }
+
+  // ── QR CODE OVERLAY — Hauptwebsite-QR (frei positionierbar) ──
   const qrInCV    = (document.getElementById('qr-in-cv')||{}).checked;
   const qrSizePx  = parseInt((document.getElementById('qr-size')||{}).value || '64');
   const qrX       = parseFloat((document.getElementById('qr-x')||{}).value ?? '4');
@@ -975,6 +1298,31 @@ function render(){
     document.getElementById('cv-paper').appendChild(overlay);
     initQRDrag(overlay);
   }
+
+  // ── FOLIO OVERLAY QRs (pos='overlay', frei auf CV) ──
+  document.querySelectorAll('[id^="cv-folio-qr-overlay-"]').forEach(el => el.remove());
+  const paper = document.getElementById('cv-paper');
+  activeFolioLinks.filter(l => l.pos === 'overlay' && l.showQR && l.qrDataUrl).forEach(l => {
+    const ox   = parseFloat((document.getElementById('fl-ox-' + l.id)||{}).value ?? '75');
+    const oy   = parseFloat((document.getElementById('fl-oy-' + l.id)||{}).value ?? '4');
+    const os   = parseInt((document.getElementById('fl-os-' + l.id)||{}).value || '64');
+    const ov   = document.createElement('div');
+    ov.id      = 'cv-folio-qr-overlay-' + l.id;
+    ov.style.position = 'absolute';
+    ov.style.left     = ox + '%';
+    ov.style.top      = oy + '%';
+    ov.style.zIndex   = '20';
+    ov.style.cursor   = 'move';
+    ov.style.userSelect = 'none';
+    ov.title = 'Ziehen zum Verschieben — ' + (l.label||l.url);
+    ov.innerHTML = `<div style="text-align:center;background:rgba(255,255,255,0.92);padding:4px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.18);">
+      <img src="${l.qrDataUrl}" style="width:${os}px;height:${os}px;display:block;image-rendering:crisp-edges;">
+      ${l.label?`<div style="font-size:7px;margin-top:2px;opacity:0.6;font-weight:600;max-width:${os+8}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h(l.label)}</div>`:''}
+    </div>`;
+    paper.appendChild(ov);
+    // Drag support — sync back to sliders
+    initFolioOverlayDrag(ov, l.id);
+  });
 
   const cvLeft=document.getElementById('cv-left');
   cvLeft.style.backgroundColor=col; cvLeft.style.color='#fff'; cvLeft.innerHTML=leftHTML;
@@ -1022,6 +1370,21 @@ function collectData(){
   return{
     name:val('f-name'),role:val('f-role'),email:val('f-email'),phone:val('f-phone'),
     address:val('f-address'),birth:val('f-birth'),web:val('f-web'),webLabel:val('f-web-label'),linkedin:val('f-linkedin'),
+    folio:val('f-folio'),folioLabel:val('f-folio-label'),
+    folioShowLink:(document.getElementById('folio-show-link')||{}).checked!==false,
+    folioShowQR:(document.getElementById('folio-show-qr')||{}).checked||false,
+    folioLinks:_folioLinks.map(l=>({
+      id:l.id,
+      url:l.url||val('fl-url-'+l.id),
+      label:l.label||val('fl-label-'+l.id),
+      showLink:(document.getElementById('fl-showlink-'+l.id)||{}).checked!==false,
+      showQR:!!((document.getElementById('fl-showqr-'+l.id)||{}).checked),
+      qrDataUrl:l.qrDataUrl||'',
+      pos:l.pos||'left',
+      overlayX:parseFloat((document.getElementById('fl-ox-'+l.id)||{}).value??l.overlayX??75),
+      overlayY:parseFloat((document.getElementById('fl-oy-'+l.id)||{}).value??l.overlayY??4),
+      overlaySize:parseInt((document.getElementById('fl-os-'+l.id)||{}).value||l.overlaySize||64),
+    })),
     summary:val('f-summary'),goal:val('f-goal'),komps:val('f-komps'),hobbies:val('f-hobbies'),
     kompsPos:val('f-komps-pos')||'right',hobbiesPos:val('f-hobbies-pos')||'right',licensePos:val('f-license-pos')||'right',
     color:state.color,font:state.font,photoData:state.photoData,
@@ -1056,6 +1419,14 @@ function applyData(d){
   state.exp=[];state.edu=[];state.skills=[];state.langs=[];state.extraquals=[];state.refs=[];state.certs=[];state.projects=[];state.page2Entries=[];
   setVal('f-name',d.name);setVal('f-role',d.role);setVal('f-email',d.email);setVal('f-phone',d.phone);
   setVal('f-address',d.address);setVal('f-birth',d.birth);setVal('f-web',d.web);setVal('f-web-label',d.webLabel||t('placeholderWebLabel'));setVal('f-linkedin',d.linkedin||'');
+  if(d.folio!=null){setVal('f-folio',d.folio);setVal('f-folio-label',d.folioLabel||'');
+    const sl=document.getElementById('folio-show-link');if(sl)sl.checked=d.folioShowLink!==false;
+    const sq=document.getElementById('folio-show-qr');if(sq)sq.checked=!!d.folioShowQR;
+    if(d.folioShowQR)updateFolioQR();}
+  // Restore multi folio links
+  const folioListEl=document.getElementById('folio-links-list');
+  if(folioListEl){folioListEl.innerHTML='';}_folioLinks=[];_folioCount=0;
+  if(Array.isArray(d.folioLinks))d.folioLinks.forEach(l=>addFolioLink(l));
   setVal('f-summary',d.summary);setVal('f-goal',d.goal);setVal('f-komps',d.komps);setVal('f-hobbies',d.hobbies);
   setVal('f-komps-pos',d.kompsPos||'right');setVal('f-hobbies-pos',d.hobbiesPos||'right');setVal('f-license-pos',d.licensePos||'right');
   setVal('f-license-note',d.licenseNote);setVal('f-right-bg',d.rightBg||'#ffffff');
