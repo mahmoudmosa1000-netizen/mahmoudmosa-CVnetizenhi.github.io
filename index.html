@@ -155,6 +155,61 @@
         <input type="text" id="f-linkedin" placeholder="https://linkedin.com/in/..." data-i18n="placeholderLinkedIn" data-i18n-attr="placeholder" oninput="renderDebounced()">
       </div>
 
+      <!-- ── DIGITALE FOLIO ── -->
+      <div class="section-divider" style="margin-top:1.25rem;" data-i18n="sectionFolio">🎨 Digitale Folio &amp; QR-Links</div>
+
+      <!-- ▸ QR-Vorteile Kasten -->
+      <div class="folio-benefits-box">
+        <div class="folio-benefits-title" data-i18n="folioWhyTitle">✨ Warum QR-Codes im Lebenslauf?</div>
+        <div class="folio-benefits-grid">
+          <div class="folio-benefit-item">
+            <span class="folio-benefit-icon">📱</span>
+            <div>
+              <strong data-i18n="folioBenefit1Title">Sofortiger Zugriff</strong>
+              <div data-i18n="folioBenefit1Desc">Recruiter scannen mit dem Handy — Ihr Portfolio öffnet sich in Sekunden, ganz ohne Tippen.</div>
+            </div>
+          </div>
+          <div class="folio-benefit-item">
+            <span class="folio-benefit-icon">🖨️</span>
+            <div>
+              <strong data-i18n="folioBenefit2Title">Auch auf Papier klickbar</strong>
+              <div data-i18n="folioBenefit2Desc">Ausgedruckte Lebensläufe bleiben interaktiv — QR-Codes überbrücken Print und Digital.</div>
+            </div>
+          </div>
+          <div class="folio-benefit-item">
+            <span class="folio-benefit-icon">🔗</span>
+            <div>
+              <strong data-i18n="folioBenefit3Title">Mehrere Links möglich</strong>
+              <div data-i18n="folioBenefit3Desc">Portfolio, GitHub, Referenzprojekt, LinkedIn — jeder Link bekommt seinen eigenen QR-Code.</div>
+            </div>
+          </div>
+          <div class="folio-benefit-item">
+            <span class="folio-benefit-icon">🎯</span>
+            <div>
+              <strong data-i18n="folioBenefit4Title">Professioneller Eindruck</strong>
+              <div data-i18n="folioBenefit4Desc">Zeigt digitale Kompetenz und hebt Ihre Bewerbung aus der Masse heraus.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▸ Anleitung -->
+      <div class="folio-guide-box">
+        <div class="folio-guide-title" data-i18n="folioGuideTitle">📋 So fügen Sie Links &amp; QR-Codes ein</div>
+        <ol class="folio-guide-steps">
+          <li data-i18n="folioStep1">Klicken Sie auf <strong>+ Link hinzufügen</strong> unten.</li>
+          <li data-i18n="folioStep2">Geben Sie die <strong>URL</strong> ein (z.B. https://behance.net/…).</li>
+          <li data-i18n="folioStep3">Wählen Sie einen <strong>Linktext</strong> — das sind die Worte, die im Lebenslauf anklickbar erscheinen (z.B. „Mein Portfolio", „GitHub-Projekte").</li>
+          <li data-i18n="folioStep4">Aktivieren Sie <strong>Als Link anzeigen</strong> und/oder <strong>QR-Code einbetten</strong> — beides kombinierbar.</li>
+          <li data-i18n="folioStep5">Alle Links &amp; QR-Codes erscheinen automatisch in der <strong>linken Seitenleiste</strong> Ihres Lebenslaufs.</li>
+          <li data-i18n="folioStep6">Fügen Sie so <strong>beliebig viele Links</strong> hinzu — z.B. Portfolio, GitHub, Referenz-Website, YouTube-Demo.</li>
+        </ol>
+      </div>
+
+      <!-- ▸ Dynamische Link-Liste -->
+      <div id="folio-links-list"></div>
+      <button class="btn-add" onclick="addFolioLink()" data-i18n="btnAddFolioLink">+ Link &amp; QR-Code hinzufügen</button>
+
       <div class="section-divider" data-i18n="sectionProfile">Profil &amp; Zusammenfassung</div>
       <div class="form-group">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
