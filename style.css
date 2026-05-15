@@ -437,3 +437,210 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
 /* ── QR OUTPUT ── */
 #qr-output img { border-radius:8px; }
 #qr-url-label  { font-size:11px; color:var(--ink-faint); text-align:center; display:block; margin-top:6px; word-break:break-all; }
+
+/* ── DIGITALE FOLIO ── */
+#folio-qr-preview { border: 1px solid var(--g-pale); }
+#folio-qr-preview img { border-radius: 6px; image-rendering: crisp-edges; }
+
+/* ════ DIGITALE FOLIO — NEUE STYLES ════ */
+
+/* Vorteile-Box */
+.folio-benefits-box {
+  background: linear-gradient(135deg, #eef4ed 0%, #f5f9f4 100%);
+  border: 1px solid var(--g-pale);
+  border-left: 3px solid var(--g-muted);
+  border-radius: 10px;
+  padding: 14px 14px 10px;
+  margin-bottom: 14px;
+}
+.folio-benefits-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-dark);
+  margin-bottom: 10px;
+  letter-spacing: 0.03em;
+}
+.folio-benefits-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.folio-benefit-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: rgba(255,255,255,0.7);
+  border-radius: 7px;
+  padding: 8px 9px;
+}
+.folio-benefit-icon { font-size: 18px; flex-shrink: 0; line-height: 1; margin-top: 1px; }
+.folio-benefit-item strong { font-size: 11px; color: var(--ink-mid); display: block; margin-bottom: 2px; }
+.folio-benefit-item div div { font-size: 10px; color: var(--ink-soft); line-height: 1.5; }
+
+/* Anleitung-Box */
+.folio-guide-box {
+  background: #fff8e8;
+  border: 1px solid #e8d8a0;
+  border-left: 3px solid #c8a830;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.folio-guide-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a6a10;
+  margin-bottom: 8px;
+}
+.folio-guide-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: #6a5010;
+  line-height: 1.8;
+}
+.folio-guide-steps li { margin-bottom: 2px; }
+.folio-guide-steps strong { color: #5a3a00; }
+
+/* Folio-Link-Karten */
+.folio-link-card {
+  background: #fff;
+  border: 1px solid var(--g-pale);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  position: relative;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s;
+}
+.folio-link-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.folio-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.folio-card-icon { font-size: 16px; }
+.folio-card-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-mid);
+  flex: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.folio-card-del {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 7px;
+  transition: all 0.15s;
+}
+.folio-card-del:hover { background: #fee; border-color: #e88; color: #c33; }
+
+/* QR-Preview in Karte */
+.folio-qr-mini-preview {
+  display: none;
+  background: #f0f4ef;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  margin-top: 8px;
+  border: 1px solid var(--g-pale);
+}
+.folio-qr-mini-preview .qr-mini-label {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Toggle-Checkboxen in Karte */
+.folio-toggle-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.folio-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+.folio-toggle-label input[type="checkbox"] {
+  accent-color: var(--g-muted);
+  width: 14px; height: 14px;
+}
+
+/* ── FOLIO POSITION BUTTONS ── */
+.folio-pos-btns {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.folio-pos-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid var(--g-pale);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.folio-pos-btn:hover {
+  border-color: var(--g-muted);
+  background: #f0f4ef;
+  color: var(--g-dark);
+}
+.folio-pos-btn.active {
+  border-color: var(--g-dark);
+  background: var(--g-dark);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(26,36,25,0.18);
+}
+
+/* ── FOLIO OVERLAY SNAP BUTTONS ── */
+.qr-snap-btn {
+  background: #f0f4ef;
+  border: 1px solid var(--g-pale);
+  border-radius: 5px;
+  font-size: 10px;
+  padding: 4px 2px;
+  cursor: pointer;
+  color: var(--ink-mid);
+  transition: all 0.12s;
+  width: 100%;
+}
+.qr-snap-btn:hover {
+  background: var(--g-dark);
+  color: #fff;
+  border-color: var(--g-dark);
+}
+
+/* ── FOLIO OVERLAY QR on CV ── */
+[id^="cv-folio-qr-overlay-"] {
+  position: absolute;
+  z-index: 20;
+  cursor: move;
+  user-select: none;
+  transition: box-shadow 0.15s;
+}
+[id^="cv-folio-qr-overlay-"]:hover {
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.22));
+}
